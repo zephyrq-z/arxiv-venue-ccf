@@ -63,35 +63,52 @@
   // ---- 渲染 ----
   const rank = res.ccf?.rank;
   const rankCls = rank ? `avc-rank-${rank.toLowerCase()}` : "";
+  const tagCats = (meta.categories || []).filter(Boolean).slice(0, 4);
+  const catBtns = tagCats.map((c) => `<span class="avc-tag avc-tag-cat">${esc(c)}</span>`).join("");
+  const kindBtn = res.ccf
+    ? `<span class="avc-tag avc-tag-kind">${esc(res.ccf.kind)}</span>`
+    : res.venueType
+      ? `<span class="avc-tag avc-tag-kind">${esc(res.venueType)}</span>`
+      : "";
   const rankBadge = res.ccf
-    ? `<span class="avc-badge ${rankCls}" title="CCF ${rank} 类">${rank}</span>`
+    ? `<span class="avc-badge ${rankCls}" title="CCF ${rank} 类">CCF-${rank}</span>`
     : "";
   const srcTag = res.venueSource
     ? `<span class="avc-src">${esc(res.venueSource)}</span>`
     : "";
 
+  // venue 有 CCF 匹配时显示缩写按钮 + 全称；无匹配显示原名
+  const abbr = res.ccf?.abbr;
+  const venueMain = abbr
+    ? `<span class="avc-venue-abbr" title="${esc(res.venue)}">${esc(abbr)}</span>
+       <span class="avc-venue-full">${esc(res.venue)}</span>`
+    : `<span class="avc-venue">${esc(res.venue)}</span>`;
+
   let html = "";
   if (res.venue) {
     html = `<div class="avc-row">
       <span class="avc-label">发表</span>
-      <span class="avc-venue">${esc(res.venue)}</span>
-      ${rankBadge}
-      ${res.ccf ? `<span class="avc-ccfinfo">${esc(res.ccf.kind)} · ${esc(res.ccf.area)}</span>` : ""}
-      <a class="avc-link" href="${esc(res.link)}" target="_blank" rel="noopener">DOI/链接 ↗</a>
+      ${venueMain}
     </div>
-    <div class="avc-row avc-sub">${srcTag}${res.venueType ? `<span>${esc(res.venueType)}</span>` : ""}</div>`;
+    <div class="avc-row avc-tags">
+      ${rankBadge}${kindBtn}${catBtns}
+      <a class="avc-linkbtn" href="${esc(res.link)}" target="_blank" rel="noopener">DOI ↗</a>
+    </div>
+    <div class="avc-row avc-sub">${srcTag}</div>`;
   } else if (res.offline) {
     html = `<div class="avc-row">
       <span class="avc-label">发表</span>
       <span class="avc-none">解析失败（Semantic Scholar 限流/网络不可用）——稍后刷新重试</span>
-      ${srcTag}
-    </div>`;
+    </div>
+    <div class="avc-row avc-tags">${catBtns}</div>
+    <div class="avc-row avc-sub">${srcTag}</div>`;
   } else {
     html = `<div class="avc-row">
       <span class="avc-label">发表</span>
       <span class="avc-none">未见正式发表（预印本）</span>
-      ${srcTag}
-    </div>`;
+    </div>
+    <div class="avc-row avc-tags">${catBtns}</div>
+    <div class="avc-row avc-sub">${srcTag}</div>`;
   }
 
   // BibTeX 折叠区
