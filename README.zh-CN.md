@@ -42,6 +42,8 @@ git clone https://github.com/zephyrq-z/arxiv-venue-ccf.git
 
 公共池限流严格（约每分钟 1 个请求）。[免费申请 key](https://www.semanticscholar.org/product/api#api-key-form)（1 req/s，全端点累计）后：
 
+> **申请须知**：请使用**学术机构邮箱**（.edu / .ac.* 等）申请——审批标准与最终解释权归 Semantic Scholar（AI2）所有，普通邮箱可能被拒。key 仅用于提高限流配额，本扩展不收集任何用户数据。
+
 点扩展图标 → **S2 Key** 粘贴 → **保存 Key**（存 `chrome.storage.local`，随 `x-api-key` header 发送）。
 
 > Chrome 扩展读不到 shell 环境变量（`~/.zshrc` 里的 `SemanticScholar_API_KEY`），粘贴一次即等价——持久化在浏览器本地。

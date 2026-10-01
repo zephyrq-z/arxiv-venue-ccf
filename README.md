@@ -42,6 +42,8 @@ git clone https://github.com/zephyrq-z/arxiv-venue-ccf.git
 
 The public pool is rate-limited aggressively (~1 request per minute). Get a [free key](https://www.semanticscholar.org/product/api#api-key-form) (1 req/s, cumulative across endpoints), then:
 
+> **Application notes**: apply with an **academic institution email** (.edu / .ac.* etc.) — approval criteria and final interpretation rights belong to Semantic Scholar (AI2); requests from personal mailboxes may be rejected. The key only raises your rate-limit quota; this extension collects no user data.
+
 Click the extension icon → paste into **S2 Key** → **Save Key** (stored in `chrome.storage.local`, sent as the `x-api-key` header).
 
 > Chrome extensions cannot read shell environment variables (`SemanticScholar_API_KEY` in `~/.zshrc`); pasting once is the equivalent — it persists locally in the browser.
