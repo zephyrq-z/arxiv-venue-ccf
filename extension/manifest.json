@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "arXiv Venue & CCF",
+  "version": "1.0.0",
+  "description": "在 arXiv abs 页显示论文正式发表 venue、CCF 评级、DOI 与 BibTeX：arXiv 自报 + Semantic Scholar/DBLP 权威解析，负缓存避免重复请求。",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://api.semanticscholar.org/*",
+    "https://dblp.org/*",
+    "https://export.arxiv.org/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["https://arxiv.org/abs/*", "http://web.archive.org/web/*/https://arxiv.org/abs/*"],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_popup": "popup.html" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
