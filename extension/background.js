@@ -5,27 +5,39 @@ import { resolveVenue } from "./resolver.js";
 import { loadCcf } from "./ccf.js";
 
 const S2_HOST = "https://api.semanticscholar.org";
-const S2_MIN_INTERVAL = 1200; // 公共限流 ~1 rps，留余量；失败指数退避
+// S2 官方限流：有 key = 1 req/s（全端点累计）；公共池实测约每分钟 1 个请求。
+// 有 key 走 1100ms（留 10% 余量），无 key 走 65s。
+const S2_MIN_INTERVAL = () => (s2Key ? 1100 : 65000);
 let lastS2 = 0;
 let queue = Promise.resolve();
-let s2Key = null; // 可选 Semantic Scholar API key（storage.local: s2key）
+let s2Key = null; // 可选 Semantic Scholar API key（storage.local: s2key，header x-api-key）
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// S2 限流退避 fetch：429/403 指数退避重试最多 3 次（2s/4s/8s），失败返回 null 走降级
+// S2 限流退避 fetch：429/403 尊重 Retry-After，否则指数退避；S2 最多 5 次、其他 1 次
 async function fetchJson(url, { api = "generic" } = {}) {
-  const timeout = api === "s2" ? 20000 : 15000;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    if (attempt > 0) await sleep(2000 * 2 ** (attempt - 1));
+  const isS2 = api === "s2";
+  const timeout = isS2 ? 20000 : 15000;
+  const maxAttempts = isS2 ? 5 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      // 有 key 限流窗口 1s（短退避够）；公共池退避更长
+      await sleep(isS2 && s2Key ? 1100 * 2 ** (attempt - 1) : 5000 * 2 ** (attempt - 1));
+    }
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeout);
     try {
       const headers = { "Accept": "application/json" };
-      if (api === "s2" && s2Key) headers["x-api-key"] = s2Key; // 可选 key（popup 里设置）
+      if (isS2 && s2Key) headers["x-api-key"] = s2Key; // key 走官方 x-api-key header
       const res = await fetch(url, { signal: ctrl.signal, headers });
+      if (res.status === 429 || res.status === 403) {
+        const ra = parseInt(res.headers.get("retry-after") || "", 10);
+        if (ra > 0) await sleep(ra * 1000); // 服务器明示的等待时间优先
+        continue; // 退避后重试
+      }
       if (!res.ok) return null;
       return res.json();
     } catch {
-      return null;
+      return null; // 网络错误/超时不重试（走降级）
     } finally {
       clearTimeout(t);
     }
@@ -36,7 +48,7 @@ async function fetchJson(url, { api = "generic" } = {}) {
 // S2 专用节流（串行队列 + 最小间隔）
 function s2Fetcher(url) {
   const run = async () => {
-    const wait = lastS2 + S2_MIN_INTERVAL - Date.now();
+    const wait = lastS2 + S2_MIN_INTERVAL() - Date.now();
     if (wait > 0) await sleep(wait);
     lastS2 = Date.now();
     return fetchJson(url, { api: "s2" });
@@ -122,6 +134,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "setKey") {
     s2Key = msg.key || null;
     chrome.storage.local.set({ s2key: s2Key }).then(() => sendResponse({ ok: true }));
+    return true;
   }
   if (msg?.type !== "resolve") return false;
   (async () => {
