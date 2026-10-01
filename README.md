@@ -2,112 +2,116 @@
 
 # arXiv Venue & CCF
 
-**在 arXiv abs 页直接看到论文正式发表在哪、CCF 评级、DOI 与 BibTeX**
+**See where an arXiv preprint was actually published, its CCF rank, DOI & BibTeX — right on the abstract page**
 
-Chrome MV3 扩展 · 零依赖 · 数据链路移植自 [arxiv-venue-resolver](https://github.com/zephyrq-z/arxiv-venue-resolver)
+Chrome MV3 extension · Zero dependencies · Resolution pipeline ported from [arxiv-venue-resolver](https://github.com/zephyrq-z/arxiv-venue-resolver)
+
+[English](README.md) | [中文](README.zh-CN.md)
 
 ![preview](docs/screenshot.png)
 
 </div>
 
-## 它做什么
+## What it does
 
-打开任意 `arxiv.org/abs/…` 页面，摘要上方自动插入一张卡片：
+Open any `arxiv.org/abs/…` page and a card appears above the abstract:
 
-| 字段 | 说明 |
+| Field | Description |
 |---|---|
-| **[NeurIPS]** + 全称 | 正式发表 venue（缩写徽章 + 全称，hover 看完整名） |
-| **CCF-A** | CCF 推荐目录评级（A 红底 / B 橙 / C 灰），681 个会议/期刊 |
-| **会议 / 期刊** | venue 类型 |
-| **cs.CL cs.LG** | 论文 arXiv 分类 |
-| **DOI ↗** | 发表版直链（无 DOI 时给 S2/DBLP 链接） |
-| **复制 BibTeX** | 一键复制；S2 现成 BibTeX 优先，预印本形态自动重拼为带正式 venue 的条目 |
+| **[NeurIPS]** + full name | The formal publication venue (abbr badge + full name, hover for details) |
+| **CCF-A** | Rank from the CCF recommended catalog (A red / B orange / C gray), 681 venues |
+| **Conference / Journal** | Venue type |
+| **cs.CL cs.LG** | The paper's arXiv categories |
+| **DOI ↗** | Direct link to the published version (falls back to S2/DBLP link) |
+| **Copy BibTeX** | One-click copy; prefers S2's ready-made BibTeX, auto-rebuilds preprint-form entries with the formal venue |
 
-未正式发表则明确显示"未见正式发表（预印本）"，并写入 90 天负缓存——之后重开该页 0 网络请求。
+If the paper is unpublished, the card says "no formal publication found (preprint)" and writes a 90-day negative cache — reopening the page costs zero network requests.
 
-## 安装
+## Install
 
-### 从源码（开发者模式）
+### From source (developer mode)
 
 ```bash
 git clone https://github.com/zephyrq-z/arxiv-venue-ccf.git
 ```
 
-1. 打开 `chrome://extensions`，右上角开启**开发者模式**
-2. **加载已解压的扩展程序** → 选择仓库里的 `extension/` 目录
+1. Open `chrome://extensions`, enable **Developer mode** (top right)
+2. **Load unpacked** → select the `extension/` directory
 
-### 推荐：设置 Semantic Scholar API key
+### Recommended: set a Semantic Scholar API key
 
-公共池限流严格（约每分钟 1 个请求）。[免费申请 key](https://www.semanticscholar.org/product/api#api-key-form)（1 req/s，全端点累计）后：
+The public pool is rate-limited aggressively (~1 request per minute). Get a [free key](https://www.semanticscholar.org/product/api#api-key-form) (1 req/s, cumulative across endpoints), then:
 
-点扩展图标 → **S2 Key** 粘贴 → **保存 Key**（存 `chrome.storage.local`，随 `x-api-key` header 发送）。
+Click the extension icon → paste into **S2 Key** → **Save Key** (stored in `chrome.storage.local`, sent as the `x-api-key` header).
 
-> Chrome 扩展读不到 shell 环境变量（`~/.zshrc` 里的 `SemanticScholar_API_KEY`），粘贴一次即等价——持久化在浏览器本地。
+> Chrome extensions cannot read shell environment variables (`SemanticScholar_API_KEY` in `~/.zshrc`); pasting once is the equivalent — it persists locally in the browser.
 
-## 解析链路（从最便宜到最权威，命中即停）
+## Resolution pipeline (cheapest first, stops at first hit)
 
 ```
-① 页面 journal_ref / DOI        0 请求，作者自报
-①' comments "Accepted at X"     0 请求，作者自报
-② Semantic Scholar by-id        权威，chrome.storage 持久缓存
-③ S2 标题搜索                    S2 未合并 venue 时（含 arXiv 预印本去前缀重投）
-④ DBLP API 兜底                  S2 查不到正式版时
-⑤ CCF 目录匹配                   缩写 / 别名 / 全称，撞名按 arXiv 分类消歧
+① journal_ref / DOI on the page    zero requests, author-claimed
+①' comments "Accepted at X"        zero requests, author-claimed
+② Semantic Scholar by-id           authoritative, cached in chrome.storage
+③ S2 title search                  when S2 hasn't merged the venue
+                                   (retries without the arXiv preprint title prefix)
+④ DBLP API fallback                when S2 finds no formal version
+⑤ CCF catalog match                abbr / alias / full name; name collisions
+                                   disambiguated by arXiv category
 ```
 
-**限流处理**（对齐 S2 官方规格）：
+**Rate limiting** (aligned with S2's official spec):
 
-- 节流：串行队列，有 key 1100ms/请求（1 rps 留 10% 余量），无 key 65s/请求
-- 退避：429/403 优先尊重响应头 `Retry-After`，否则指数退避，S2 最多重试 5 次
-- 缓存：解析结果持久化；负缓存（确认未发表）90 天过期；限流/断网结果**不写缓存**，刷新即重试
+- Throttle: serial queue — 1100ms/request with a key (1 rps + 10% margin), 65s without
+- Backoff: on 429/403, honor the `Retry-After` header first, else exponential backoff, up to 5 S2 retries
+- Cache: results persist; negative cache (confirmed unpublished) expires after 90 days; rate-limited/offline results are **never cached** — refresh retries immediately
 
-## 与 Super arXiv 等同类扩展的差异
+## How it differs from Super arXiv & similar extensions
 
-| | Super arXiv | 本扩展 |
+| | Super arXiv | This extension |
 |---|---|---|
-| CCF 评级 | 无 | 681 venue 目录 + 别名映射（PACMSE→FSE）+ 撞名消歧（FSE 既是加密 B 会又是软工 A 会） |
-| 数据源可信度 | 不区分 | journal_ref / comments 标注 author-claimed；S2 / DBLP 权威 |
-| 限流 | — | 官方规格节流 + Retry-After 退避 + 负缓存，每篇最多完整解析一次 |
-| 兜底 | — | S2 by-id → S2 标题搜索 → DBLP |
-| 未发表判定 | — | CoRR / arXiv 镜像 venue 视为未发表，继续找正式版；限流 ≠ 未发表（语义分离） |
-| 数据源标注 | — | 卡片上直接标 `Semantic Scholar` / `arXiv comments (author-claimed)` 等 |
+| CCF rank | none | 681-venue catalog + alias mapping (PACMSE→FSE) + collision disambiguation (FSE is both a crypto B-conference and the SE A-conference) |
+| Source trust | undifferentiated | journal_ref / comments marked author-claimed; S2 / DBLP authoritative |
+| Rate limiting | — | official-spec throttle + Retry-After backoff + negative cache; each paper fully resolved at most once |
+| Fallbacks | — | S2 by-id → S2 title search → DBLP |
+| Unpublished detection | — | CoRR / arXiv mirror venues treated as unpublished, keeps looking for the formal version; rate-limited ≠ unpublished (semantics separated) |
+| Source attribution | — | the card shows `Semantic Scholar` / `arXiv comments (author-claimed)` etc. |
 
-## 开发
+## Development
 
 ```bash
-python3 scripts/build_ccf_json.py  # 重新生成 data/ccf.json（源：arxiv-venue-resolver/ccf_v7.tsv）
-npm run build                      # 同步 src/ + data/ 到 extension/（改 src 后必跑）
-npm run test:offline               # 离线单测（无网络）：CCF 匹配/消歧/comments 提取/数据完整性
-node test/one.mjs                  # 网络冒烟：真实 S2 解析
-python3 scripts/e2e_check.py       # 端到端：headless Chrome + CDP 安装扩展 + abs 页断言
+python3 scripts/build_ccf_json.py  # regenerate data/ccf.json (source: arxiv-venue-resolver/ccf_v7.tsv)
+npm run build                      # sync src/ + data/ into extension/ (run after editing src/)
+npm run test:offline               # offline tests (no network): CCF matching/disambiguation, comments extraction, data integrity
+node test/one.mjs                  # network smoke test: real S2 resolution
+python3 scripts/e2e_check.py       # end-to-end: headless Chrome + CDP extension install + abs page assertion
 ```
 
-无依赖：Node ≥ 22（测试用）、Python 3（仅构建脚本）。扩展本体零构建零依赖。
+No dependencies: Node ≥ 22 (for tests), Python 3 (build scripts only). The extension itself needs no build step and has zero dependencies.
 
-## 文件结构
+## File layout
 
 ```
-extension/            ← Chrome 加载这个目录
-  manifest.json         MV3 清单（storage 权限 + S2/DBLP/arXiv host 权限）
-  content.js            abs 页元数据提取（零请求）+ 卡片渲染
-  background.js         SW：S2 节流退避、DBLP 兜底、缓存、API key
-  popup.{html,js}       手动解析任意 arXiv ID + S2 key 设置
-  style.css             卡片样式
-  data/ccf.json         CCF 目录（681 条，生成物）
-src/                  ← 逻辑源码（与 extension/ 同步，Node 可直接测试）
-  resolver.js           解析链路
-  ccf.js                CCF 匹配/消歧
-scripts/              ← 构建 / E2E
-test/                 ← 离线单测 + 网络冒烟
-docs/screenshot.png   ← 预览图
+extension/            ← load this directory into Chrome
+  manifest.json         MV3 manifest (storage permission + S2/DBLP/arXiv hosts)
+  content.js            abs-page metadata extraction (zero requests) + card rendering
+  background.js         SW: S2 throttle/backoff, DBLP fallback, cache, API key
+  popup.{html,js}       resolve any arXiv ID manually + S2 key settings
+  style.css             card styling
+  data/ccf.json         CCF catalog (681 entries, generated)
+src/                  ← logic source (synced into extension/, testable in Node)
+  resolver.js           resolution pipeline
+  ccf.js                CCF matching / disambiguation
+scripts/              ← build / E2E
+test/                 ← offline tests + network smoke test
+docs/screenshot.png   ← preview image
 ```
 
-## 已知限制
+## Known limitations
 
-- S2 公共池限流严格：无 key 时首次解析可能要等 1–2 分钟退避（卡片会显示"解析失败（限流）——稍后刷新重试"，刷新即重试，不写缓存）。
-- DBLP API 可能被 Anubis bot 防护拦截（取决于网络环境）；此时依赖 S2。
-- 老式 arXiv ID（`math.AG/0701001` 带点子库）不解析，静默跳过。
-- comments 提取的 venue 可能带尾部噪声（"CIKM 2026 as a full paper"），由 CCF 全称匹配与 S2/DBLP 兜底修正。
+- S2's public pool is strictly rate-limited: without a key, the first resolution may wait 1–2 minutes in backoff (the card shows "resolution failed (rate limit) — refresh to retry"; refresh retries, nothing is cached).
+- The DBLP API may be blocked by Anubis bot protection (network-dependent); S2 covers then.
+- Legacy arXiv IDs (`math.AG/0701001` dotted subarchives) are skipped silently.
+- Venue strings extracted from comments may carry trailing noise ("CIKM 2026 as a full paper"); CCF full-name matching and the S2/DBLP fallbacks correct this.
 
 ## License
 
