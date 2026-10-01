@@ -1,6 +1,8 @@
 /* arXiv Venue & CCF — abs 页注入卡片 */
 .avc-box {
-  margin: 12px 0 4px;
+  margin: 12px 40px 4px;      /* 左右余量，与 .abstract 正文对齐 */
+  max-width: 1026px;           /* 大屏下与 arXiv 主栏同宽，不顶到两侧 */
+  box-sizing: border-box;
   padding: 12px 16px;
   border: 1px solid #d8d4cc;
   border-left: 4px solid #b31b1b;
