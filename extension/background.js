@@ -103,10 +103,16 @@ async function getCcf() {
 }
 
 // ---------- 入口 ----------
-// MV3 SW 随时被杀重启：顶层 await 保证每次冷启动都读 key（不只 onInstalled）
-s2Key = (await chrome.storage.local.get("s2key")).s2key || null;
+// MV3 SW 随时被杀重启：key 用惰性读取（每次用时从 storage 拿，带内存缓存）
+let s2KeyLoaded = false;
+async function ensureKey() {
+  if (!s2KeyLoaded) {
+    s2Key = (await chrome.storage.local.get("s2key")).s2key || null;
+    s2KeyLoaded = true;
+  }
+}
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes.s2key) s2Key = changes.s2key.newValue || null;
+  if (area === "local" && changes.s2key) { s2Key = changes.s2key.newValue || null; s2KeyLoaded = true; }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -120,6 +126,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type !== "resolve") return false;
   (async () => {
     try {
+      await ensureKey();
       const rows = await getCcf();
       const r = await resolveVenue(
         msg.id, msg.meta, rows,

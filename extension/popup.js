@@ -46,6 +46,8 @@ function render(res) {
     h += `<div class="row">发表: ${esc(res.venue)} ${badge}
       <span class="muted">${esc(res.ccf?.kind || "")} ${esc(res.ccf?.area || "")}</span></div>`;
     h += `<div class="muted">来源: ${esc(res.venueSource)}</div>`;
+  } else if (res.offline) {
+    h += '<div class="row">解析失败（S2 限流/网络不可用），稍后重试</div>';
   } else {
     h += '<div class="row">未见正式发表（预印本）</div>';
   }

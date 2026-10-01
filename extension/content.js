@@ -80,6 +80,12 @@
       <a class="avc-link" href="${esc(res.link)}" target="_blank" rel="noopener">DOI/链接 ↗</a>
     </div>
     <div class="avc-row avc-sub">${srcTag}${res.venueType ? `<span>${esc(res.venueType)}</span>` : ""}</div>`;
+  } else if (res.offline) {
+    html = `<div class="avc-row">
+      <span class="avc-label">发表</span>
+      <span class="avc-none">解析失败（Semantic Scholar 限流/网络不可用）——稍后刷新重试</span>
+      ${srcTag}
+    </div>`;
   } else {
     html = `<div class="avc-row">
       <span class="avc-label">发表</span>

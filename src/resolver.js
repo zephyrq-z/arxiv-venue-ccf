@@ -111,7 +111,7 @@ export async function resolveVenue(aid, meta, ccfRows, fetcher, cache, opts = {}
   const out = {
     arxivId: aid, title: meta.title,
     venue: null, venueSource: null, venueType: null, doi: realDoi(meta.doi),
-    ccf: null, link: null, bibtex: null, year: meta.year, preprintOnly: false,
+    ccf: null, link: null, bibtex: null, year: meta.year, preprintOnly: false, offline: false,
   };
   let { venue, vtype, source, doi, bibtex, year } = { ...out };
   let s2Link = null;
@@ -131,6 +131,7 @@ export async function resolveVenue(aid, meta, ccfRows, fetcher, cache, opts = {}
         s2c = await resolveS2(aid, meta, fetcher); // ② by-id + ③ 标题搜索，网络步
         if (cache && !s2c.offline) await cache.put(aid, s2c); // offline（限流/断网）不写缓存，避免污染
       }
+      out.offline = !!s2c.offline && !venue; // 网络不可用 ≠ 未发表（负缓存 resolved:false 才是确认）
       if (s2c.resolved) {
         venue = s2c.venue;
         vtype = s2c.vtype;
